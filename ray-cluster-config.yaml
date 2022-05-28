@@ -1,0 +1,50 @@
+cluster_name: ought
+max_workers: 2
+upscaling_speed: 1.0
+idle_timeout_minutes: 5
+
+docker:
+    image: "rayproject/ray-ml:latest-gpu"
+    container_name: "ray_container"
+    pull_before_run: True
+    run_options:
+        - --ulimit nofile=65536:65536
+
+provider:
+    type: aws
+    region: us-west-2
+    availability_zone: us-west-2a,us-west-2b
+auth:
+    ssh_user: ubuntu
+
+available_node_types:
+    ray.head.default:
+        node_config:
+            InstanceType: m5.large
+            ImageId: ami-0a2363a9cff180a64 # Deep Learning AMI (Ubuntu) Version 30
+            BlockDeviceMappings:
+                - DeviceName: /dev/sda1
+                  Ebs:
+                      VolumeSize: 100
+    ray.worker.default:
+        min_workers: 0
+        max_workers: 2
+        resources: {}
+        node_config:
+            InstanceType: m5.large
+            ImageId: ami-0a2363a9cff180a64 # Deep Learning AMI (Ubuntu) Version 30
+
+head_node_type: ray.head.default
+rsync_exclude:
+    - "**/.git"
+    - "**/.git/**"
+rsync_filter:
+    - ".gitignore"
+
+head_start_ray_commands:
+    - ray stop
+    - ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml
+
+worker_start_ray_commands:
+    - ray stop
+    - ray start --address=$RAY_HEAD_IP:6379 --object-manager-port=8076
